@@ -1,0 +1,15 @@
+---
+relays:
+  - type: GPIO
+    name: display
+    attrs:
+      pin: 23
+  - type: GPIO
+    name: sound
+    attrs:
+      pin: 24
+  - type: WiFi
+    name: heater
+    attrs:
+      url: http://10.10.10.10/api/relay/1
+...
