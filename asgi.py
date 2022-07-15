@@ -11,6 +11,8 @@ import RPi.GPIO as GPIO
 import yaml
 from fastapi import FastAPI, HTTPException, Path
 from fastapi.responses import JSONResponse
+from mpd import MPDClient
+from mpd.base import ConnectionError as MPDConnectionError
 
 
 class Relay:
@@ -87,6 +89,9 @@ for r in cfg['relays']:
     except Exception as e:
         logging.error(f"Failed to init relay: {r['name']}")
 
+# init mpd client
+mpc = MPDClient()
+
 
 @app.exception_handler(Relay.UnavailableError)
 async def relay_unavailable_exception_handler(request, exc):
@@ -105,7 +110,8 @@ class RelayField(str):
     @classmethod
     def validate_relay_name(cls, v):
         if not v in relays:
-            raise HTTPException(status_code=404, detail=f'Relay {v} not found')
+            raise HTTPException(status_code=404,
+                                detail=f'Relay [{v}] not found')
         return cls(v)
 
 
@@ -116,7 +122,7 @@ def get_relay_list():
         try:
             res[n] = r.info()
         except Relay.UnavailableError:
-            logging.warning(f'Relay {n} is not available')
+            logging.warning(f'Relay [{n}] is not available')
             res[n] = 'Unavailable'
     return res
 
@@ -140,5 +146,28 @@ def send_relay_action(name: RelayField,
     res = relays[name].get_state()
     if action != 'state':
         res = {'state': res}
+
+    return res
+
+
+@app.get('/api/mpc/{action}')
+def mpc_send_command(action: str, args: str = ''):
+
+    # check connection
+    try:
+        mpc.ping()
+    except MPDConnectionError:
+        mpc.connect(cfg['mpd']['host'], cfg['mpd']['port'])
+
+    # validate action
+    if action not in mpc.commands():
+        raise HTTPException(status_code=422, detail=f'Wrong mpc command')
+
+    # send command to mpd
+    try:
+        res = eval(f'mpc.{action}({args})')
+    except Exception as e:
+        raise HTTPException(status_code=500,
+                            detail=f'Failed to exec [{action}]: {e}')
 
     return res

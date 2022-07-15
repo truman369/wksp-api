@@ -12,4 +12,7 @@ relays:
     name: heater
     attrs:
       url: http://10.10.10.10/api/relay/1
+mpd:
+  host: 127.0.0.1
+  port: 6600
 ...
