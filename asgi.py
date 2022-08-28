@@ -9,6 +9,10 @@ import sys
 import requests
 import RPi.GPIO as GPIO
 import yaml
+from adafruit_bme280.basic import Adafruit_BME280_I2C as BME
+from adafruit_htu21d import HTU21D as HTU
+from adafruit_sht31d import SHT31D as SHT
+from board import I2C
 from fastapi import FastAPI, HTTPException, Path
 from fastapi.responses import JSONResponse
 from mpd import MPDClient
@@ -70,6 +74,38 @@ class Relay:
         return res
 
 
+class Sensor:
+    """Common sensor class"""
+
+    def __init__(self, sensor_type: str,
+                 attrs: dict = {}, capabilities: dict = {}):
+        sensor_type, driver = sensor_type.split('_')
+        if sensor_type == 'I2C' and driver in ['BME', 'HTU', 'SHT']:
+            driver = eval(driver)
+            self._sensor = driver(I2C(), **attrs)
+        else:
+            raise Exception(f'Wrong sensor type: {sensor_type}')
+        self.capabilities = capabilities
+
+    def get_values(self):
+        """Return dict of values"""
+        res = {}
+        for cap_key, cap_val in self.capabilities.items():
+            res_key = cap_key
+            # get value from sensor
+            res_val = eval(f'self._sensor.{cap_key}')
+            # modify key and value if needed
+            if cap_val is not None:
+                if 'alias' in cap_val:
+                    res_key = cap_val['alias']
+                if 'calibration' in cap_val:
+                    res_val = eval(cap_val['calibration'].format(res_val))
+            # format value
+            res_val = '{:0.2f}'.format(res_val)
+            res[res_key] = res_val
+        return res
+
+
 # init fastapi
 app = FastAPI()
 
@@ -91,6 +127,17 @@ for r in cfg['relays']:
 
 # init mpd client
 mpc = MPDClient()
+
+# init sensors
+sensors = {}
+for s in cfg['sensors']:
+    kwargs = {}
+    # add optional kwargs
+    [kwargs.update({a: s[a]}) for a in ['attrs', 'capabilities'] if a in s]
+    try:
+        sensors[s['name']] = Sensor(s['type'], **kwargs)
+    except Exception as e:
+        logging.error(f"Failed to init {s['name']} sensor: {e}")
 
 
 @app.exception_handler(Relay.UnavailableError)
@@ -170,4 +217,21 @@ def mpc_send_command(action: str, args: str = ''):
         raise HTTPException(status_code=500,
                             detail=f'Failed to exec [{action}]: {e}')
 
+    return res
+
+
+@app.get('/api/sensor')
+def get_sensor_list():
+    res = {}
+    for n, s in sensors.items():
+        res[n] = s.get_values()
+    return res
+
+
+@app.get('/api/sensor/{name}')
+def get_sensor_values(name: str):
+    if name not in sensors:
+        raise HTTPException(status_code=404,
+                            detail=f'Sensor [{name}] not found')
+    res = sensors[name].get_values()
     return res

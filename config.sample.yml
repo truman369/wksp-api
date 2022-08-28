@@ -4,15 +4,43 @@ relays:
     name: display
     attrs:
       pin: 23
+
   - type: GPIO
     name: sound
     attrs:
       pin: 24
+
   - type: WiFi
     name: heater
     attrs:
       url: http://10.10.10.10/api/relay/1
+
 mpd:
   host: 127.0.0.1
   port: 6600
+
+sensors:
+  - type: I2C_BME
+    name: out
+    attrs:
+      address: 0x76
+    capabilities:
+      temperature:
+        calibration: '{} + 1'
+      humidity:
+        calibration: '{} - 10'
+      pressure:
+        calibration: '{}/1.333 + 2'
+
+  - type: I2C_SHT
+    name: in
+    capabilities:
+      temperature:
+      relative_humidity:
+        alias: humidity
+
+  - type: I2C_HTU
+    name: under
+    capabilities:
+      temperature:
 ...
