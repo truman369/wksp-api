@@ -163,7 +163,7 @@ class RelayField(str):
 
 
 @app.get('/api/relay')
-def get_relay_list():
+def relay_get_list():
     res = {}
     for n, r in relays.items():
         try:
@@ -175,13 +175,13 @@ def get_relay_list():
 
 
 @app.get('/api/relay/{name}')
-def get_relay_info(name: RelayField):
+def relay_get_info(name: RelayField):
     res = relays[name].info()
     return res
 
 
 @app.get('/api/relay/{name}/{action}')
-def send_relay_action(name: RelayField,
+def relay_send_action(name: RelayField,
                       action: str = Path(regex=r'^(on|off|toggle|state)$')):
 
     if action == 'toggle':
@@ -214,24 +214,34 @@ def mpc_send_command(action: str, args: str = ''):
     try:
         res = eval(f'mpc.{action}({args})')
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f'Failed to exec [{action}]: {e}')
+        msg = f'Failed to exec [{action}]: {e}'
+        logging.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
 
     return res
 
 
 @app.get('/api/sensor')
-def get_sensor_list():
+def sensor_get_list():
     res = {}
     for n, s in sensors.items():
-        res[n] = s.get_values()
+        try:
+            res[n] = s.get_values()
+        except Exception as e:
+            logging.error(f'Failed to get sensor [{name}] values: {e}')
+            res[n] = {}
     return res
 
 
 @app.get('/api/sensor/{name}')
-def get_sensor_values(name: str):
+def sensor_get_values(name: str):
     if name not in sensors:
         raise HTTPException(status_code=404,
                             detail=f'Sensor [{name}] not found')
-    res = sensors[name].get_values()
+    try:
+        res = sensors[name].get_values()
+    except Exception as e:
+        msg = f'Failed to get sensor [{name}] values: {e}'
+        logging.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
     return res
