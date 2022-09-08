@@ -228,7 +228,7 @@ def sensor_get_list():
         try:
             res[n] = s.get_values()
         except Exception as e:
-            logging.error(f'Failed to get sensor [{name}] values: {e}')
+            logging.error(f'Failed to get sensor [{n}] values: {e}')
             res[n] = {}
     return res
 
