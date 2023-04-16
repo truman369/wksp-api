@@ -22,14 +22,12 @@ from mpd.base import ConnectionError as MPDConnectionError
 class Relay:
     """Common relay class"""
 
-    def __init__(self, relay_type: str, attrs: dict, state: bool = False):
+    def __init__(self, relay_type: str, attrs: dict):
         self.type = relay_type
         self.attrs = attrs
         # init relay
         if self.type == 'GPIO':
             GPIO.setup(self.attrs['pin'], GPIO.OUT)
-        # set inital state
-        self.set_state(state)
 
     class UnavailableError(Exception):
         """Custom exception"""
