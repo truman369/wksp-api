@@ -42,7 +42,8 @@ class Relay:
             GPIO.output(self.attrs['pin'], int(not state))
         elif self.type == 'WiFi':
             try:
-                requests.put(self.attrs['url'], data={'state': int(state)})
+                requests.put(self.attrs['url'], timeout=1,
+                             data={'state': int(state)})
             except requests.exceptions.ConnectionError:
                 raise self.UnavailableError()
 
@@ -52,7 +53,7 @@ class Relay:
             res = not bool(GPIO.input(self.attrs['pin']))
         elif self.type == 'WiFi':
             try:
-                res = requests.get(self.attrs['url'], timeout=3)
+                res = requests.get(self.attrs['url'], timeout=1)
             except requests.exceptions.ConnectionError:
                 raise self.UnavailableError()
             else:
@@ -85,13 +86,20 @@ class Sensor:
             raise Exception(f'Wrong sensor type: {sensor_type}')
         self.capabilities = capabilities
 
+    class UnavailableError(Exception):
+        """Custom exception"""
+        pass
+
     def get_values(self):
         """Return dict of values"""
         res = {}
         for cap_key, cap_val in self.capabilities.items():
             res_key = cap_key
             # get value from sensor
-            res_val = eval(f'self._sensor.{cap_key}')
+            try:
+                res_val = eval(f'self._sensor.{cap_key}')
+            except IOError:
+                raise self.UnavailableError()
             # modify key and value if needed
             if cap_val is not None:
                 if 'alias' in cap_val:
@@ -145,6 +153,13 @@ async def relay_unavailable_exception_handler(request, exc):
                         status_code=503)
 
 
+@app.exception_handler(Relay.UnavailableError)
+async def sensor_unavailable_exception_handler(request, exc):
+    """Relay unavailable error handler"""
+    return JSONResponse(content={"detail": "Sensor is not available"},
+                        status_code=503)
+
+
 class RelayField(str):
     """Relay name field type"""
 
@@ -168,7 +183,7 @@ def relay_get_list():
             res[n] = r.info()
         except Relay.UnavailableError:
             logging.warning(f'Relay [{n}] is not available')
-            res[n] = 'Unavailable'
+            res[n] = 'N/A'
     return res
 
 
@@ -225,9 +240,9 @@ def sensor_get_list():
     for n, s in sensors.items():
         try:
             res[n] = s.get_values()
-        except Exception as e:
-            logging.error(f'Failed to get sensor [{n}] values: {e}')
-            res[n] = {}
+        except Sensor.UnavailableError:
+            logging.warning(f'Sensor [{n}] is not available')
+            res[n] = 'N/A'
     return res
 
 
@@ -236,10 +251,6 @@ def sensor_get_values(name: str):
     if name not in sensors:
         raise HTTPException(status_code=404,
                             detail=f'Sensor [{name}] not found')
-    try:
-        res = sensors[name].get_values()
-    except Exception as e:
-        msg = f'Failed to get sensor [{name}] values: {e}'
-        logging.error(msg)
-        raise HTTPException(status_code=500, detail=msg)
+    res = sensors[name].get_values()
+
     return res
