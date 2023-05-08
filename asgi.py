@@ -153,7 +153,7 @@ async def relay_unavailable_exception_handler(request, exc):
                         status_code=503)
 
 
-@app.exception_handler(Relay.UnavailableError)
+@app.exception_handler(Sensor.UnavailableError)
 async def sensor_unavailable_exception_handler(request, exc):
     """Relay unavailable error handler"""
     return JSONResponse(content={"detail": "Sensor is not available"},
