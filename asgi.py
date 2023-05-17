@@ -99,7 +99,7 @@ class Sensor:
             try:
                 res_val = eval(f'self._sensor.{cap_key}')
             except Exception as e:
-                logging.error(f'{self.sensor_type}_{self.driver} error: {e}')
+                logging.error(f'Sensor error: {e}')
                 raise self.UnavailableError()
             # modify key and value if needed
             if cap_val is not None:
