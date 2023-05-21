@@ -124,6 +124,10 @@ GPIO.setwarnings(False)
 with open('config.yml', 'r') as file:
     cfg = yaml.safe_load(file)
 
+# power up i2c bus
+GPIO.setup(cfg['system']['i2c_power_pin'], GPIO.OUT)
+GPIO.output(cfg['system']['i2c_power_pin'], 1)
+
 # init relays
 relays = {}
 for r in cfg['relays']:
@@ -242,8 +246,16 @@ def sensor_get_list():
         try:
             res[n] = s.get_values()
         except Sensor.UnavailableError:
-            logging.warning(f'Sensor [{n}] is not available')
-            res[n] = 'N/A'
+            # try to reset i2c bus
+            logging.warning(f'Restarting i2c bus')
+            GPIO.output(cfg['system']['i2c_power_pin'], 0)
+            GPIO.output(cfg['system']['i2c_power_pin'], 1)
+            # check again
+            try:
+                res[n] = s.get_values()
+            except Sensor.UnavailableError:
+                logging.warning(f'Sensor [{n}] is not available')
+                res[n] = 'N/A'
     return res
 
 

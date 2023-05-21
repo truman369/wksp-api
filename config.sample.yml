@@ -1,4 +1,7 @@
 ---
+system:
+  i2c_power_pin: 4
+
 relays:
   - type: GPIO
     name: display
