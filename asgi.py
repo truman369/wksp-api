@@ -42,9 +42,10 @@ class Relay:
             GPIO.output(self.attrs['pin'], int(not state))
         elif self.type == 'WiFi':
             try:
-                requests.put(self.attrs['url'], timeout=1,
+                requests.put(self.attrs['url'], timeout=5,
                              data={'state': int(state)})
-            except requests.exceptions.ConnectionError:
+            except Exception as e:
+                logging.error(f'WiFi relay error: {e}')
                 raise self.UnavailableError()
 
     def get_state(self):
@@ -53,8 +54,9 @@ class Relay:
             res = not bool(GPIO.input(self.attrs['pin']))
         elif self.type == 'WiFi':
             try:
-                res = requests.get(self.attrs['url'], timeout=1)
-            except requests.exceptions.ConnectionError:
+                res = requests.get(self.attrs['url'], timeout=5)
+            except Exception as e:
+                logging.error(f'WiFi relay error: {e}')
                 raise self.UnavailableError()
             else:
                 res = res.json()
